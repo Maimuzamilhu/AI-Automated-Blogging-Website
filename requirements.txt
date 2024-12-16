@@ -1,0 +1,17 @@
+Flask
+beautifulsoup4
+requests
+SQLAlchemy
+transformers
+feedparser
+flask_sqlalchemy
+openai
+
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+jinja2
+python-multipart
+aiofiles
+cohere
