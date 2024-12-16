@@ -8,6 +8,8 @@ from datetime import datetime
 from typing import Dict
 import uvicorn
 from sqlalchemy import or_
+from sqlalchemy import desc
+from math import ceil
 
 
 # Import the database model from create_db.py
@@ -26,11 +28,39 @@ def get_db():
         db.close()
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request, db: Session = Depends(get_db)):
-    articles = db.query(ArticleDB).order_by(desc(ArticleDB.created_at)).limit(3).all()
+async def read_root(request: Request, page: int = 1, db: Session = Depends(get_db)):
+    # Number of articles per page
+    per_page = 3
+    
+    # Get total number of articles
+    total_articles = db.query(ArticleDB).count()
+    total_pages = (total_articles + per_page - 1) // per_page
+    
+    # Ensure page is within valid range
+    page = max(1, min(page, total_pages))
+    
+    # Get articles for current page
+    articles = db.query(ArticleDB)\
+        .order_by(desc(ArticleDB.created_at))\
+        .offset((page - 1) * per_page)\
+        .limit(per_page)\
+        .all()
+    
+    # Get recent articles for sidebar
+    recent_articles = db.query(ArticleDB)\
+        .order_by(desc(ArticleDB.created_at))\
+        .limit(5)\
+        .all()
+    
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "articles": articles}
+        {
+            "request": request,
+            "articles": articles,
+            "recent_articles": recent_articles,
+            "current_page": page,
+            "total_pages": total_pages
+        }
     )
 
 @app.get("/health")
@@ -50,6 +80,58 @@ async def article(request: Request, article_id: int, db: Session = Depends(get_d
     article = db.query(ArticleDB).filter(ArticleDB.id == article_id).first()
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found")
+    
+    # Rewrite the article content if it hasn't been processed
+    if not article.content.startswith('<h1>') and not article.content.startswith('<h2>'):
+        try:
+            model = genai.GenerativeModel('gemini-pro')
+            
+            # Enhanced prompt for better article rewriting
+            prompt = f"""
+            As an expert AI journalist, rewrite and enhance this article following these guidelines:
+
+            CONTENT STRUCTURE:
+            1. Introduction (Hook + Context)
+            2. Main Body (3-4 key sections)
+            3. Expert Analysis/Insights
+            4. Conclusion/Future Implications
+
+            FORMATTING REQUIREMENTS:
+            - Use proper HTML tags (h1, h2, h3, p, ul, li)
+            - Include bullet points for key takeaways
+            - Add subheadings every 2-3 paragraphs
+            - Format quotes and statistics properly
+            - Include a "Key Takeaways" section
+            - Add a "Why It Matters" section
+
+            SEO OPTIMIZATION:
+            - Use relevant keywords naturally
+            - Include semantic HTML markup
+            - Create scannable content
+            - Optimize headings hierarchy
+            - Include internal linking suggestions
+
+            WRITING STYLE:
+            - Professional and authoritative tone
+            - Clear and concise paragraphs
+            - Engaging transitions
+            - Data-driven insights
+            - Industry expert perspectives
+
+            Original Article:
+            {article.content}
+
+            Please rewrite this as a comprehensive, well-structured article following the above guidelines.
+            Format in clean HTML with proper semantic structure.
+            """
+
+            response = model.generate_content(prompt)
+            if response.text:
+                article.content = response.text.strip()
+                db.commit()
+        except Exception as e:
+            print(f"Error rewriting article: {str(e)}")
+    
     return templates.TemplateResponse(
         "article.html",
         {"request": request, "article": article}

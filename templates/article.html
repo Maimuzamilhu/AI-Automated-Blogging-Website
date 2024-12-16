@@ -13,18 +13,88 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        .article-content h1 { @apply text-3xl font-bold mb-6 mt-8; }
-        .article-content h2 { @apply text-2xl font-bold mb-4 mt-6; }
-        .article-content h3 { @apply text-xl font-bold mb-3 mt-5; }
-        .article-content p { @apply mb-4 text-gray-700 leading-relaxed; }
-        .article-content ul { @apply list-disc pl-6 mb-4; }
-        .article-content ol { @apply list-decimal pl-6 mb-4; }
-        .article-content li { @apply mb-2; }
-        .article-content blockquote { @apply border-l-4 border-blue-500 pl-4 italic my-4; }
-        .article-content code { @apply bg-gray-100 px-2 py-1 rounded; }
-        .article-content pre { @apply bg-gray-100 p-4 rounded mb-4 overflow-x-auto; }
-        .article-content img { @apply max-w-full h-auto my-4 rounded-lg; }
-        .article-content a { @apply text-blue-600 hover:text-blue-800 underline; }
+        .financial-analysis {
+            @apply max-w-4xl mx-auto;
+        }
+        .market-summary {
+            @apply mb-8;
+        }
+        .key-metrics {
+            @apply mb-8;
+        }
+        .financial-metrics {
+            @apply w-full border-collapse border border-gray-300 mb-6;
+        }
+        .financial-metrics th,
+        .financial-metrics td {
+            @apply border border-gray-300 p-3 text-left;
+        }
+        .technical-analysis {
+            @apply mb-8;
+        }
+        .expert-commentary {
+            @apply mb-8;
+        }
+        .expert-quote {
+            @apply border-l-4 border-blue-500 pl-4 py-2 my-4 bg-blue-50 italic;
+        }
+        .investment-implications {
+            @apply mb-8;
+        }
+        .key-takeaways {
+            @apply list-disc pl-6 space-y-2 my-4;
+        }
+        .risk-analysis {
+            @apply mb-8;
+        }
+        .risk-factors {
+            @apply list-disc pl-6 space-y-2 my-4;
+        }
+        .future-outlook {
+            @apply mb-8;
+        }
+        h2 {
+            @apply text-2xl font-bold mb-4 text-gray-800;
+        }
+        p {
+            @apply text-gray-700 leading-relaxed mb-4;
+        }
+        .tech-analysis {
+            @apply max-w-4xl mx-auto leading-relaxed;
+        }
+        .article-header {
+            @apply mb-8;
+        }
+        .article-header h1 {
+            @apply text-4xl font-bold mb-4 text-gray-900;
+        }
+        .article-meta {
+            @apply text-gray-600 mb-4 flex gap-4;
+        }
+        .executive-summary {
+            @apply bg-gray-50 p-6 rounded-lg mb-8 border-l-4 border-blue-500;
+        }
+        .key-points {
+            @apply list-disc pl-6 space-y-2;
+        }
+        .main-content section {
+            @apply mb-8;
+        }
+        .main-content h2 {
+            @apply text-2xl font-bold mb-4 text-gray-800;
+        }
+        .expert-quote {
+            @apply border-l-4 border-green-500 pl-4 py-2 my-4 bg-green-50 italic;
+        }
+        .user-impact-points {
+            @apply list-disc pl-6 space-y-2 my-4;
+        }
+        .technical-details {
+            @apply bg-gray-50 p-6 rounded-lg my-6;
+        }
+        .conclusion {
+            @apply bg-blue-50 p-6 rounded-lg my-6 border-l-4 border-blue-500;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -80,7 +150,7 @@
                 </div>
             </header>
 
-            <div class="prose max-w-none article-content">
+            <div class="prose max-w-none text-gray-800">
                 {{article.content|safe}}
             </div>
 

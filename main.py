@@ -1,16 +1,15 @@
+from typing import List, Dict
 import feedparser
 import requests
 from bs4 import BeautifulSoup
-import google.generativeai as genai
-import re
-from typing import Dict, List
-import os
-from datetime import datetime
-import random
 import time
+import random
+import re
+from datetime import datetime
+import hashlib
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
-import hashlib
+import google.generativeai as genai
 
 # Configure Google Gemini API
 GOOGLE_API_KEY = "AIzaSyA_Wkb7YQgw4vY7ECIW5NhoxIiaKb9WvcY"
@@ -25,7 +24,8 @@ class ArticleProcessor:
         # Web Scraping Setup
         self.user_agents = [
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0'
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         ]
         self.session = self._create_session()
 
@@ -104,45 +104,111 @@ class ArticleProcessor:
 
     def rewrite_article(self, article: Dict) -> Dict:
         try:
-            prompt = (
-                "You are a professional tech journalist writing for TrendWave. "
-                "Create a well-structured, SEO-optimized article following these guidelines:\n\n"
-                "1. Structure:\n"
-                "- Start with an engaging introduction\n"
-                "- Use proper H2 and H3 headings\n"
-                "- Include bullet points for key information\n"
-                "- Add a conclusion\n\n"
-                "2. SEO Guidelines:\n"
-                "- Use relevant keywords naturally\n"
-                "- Include internal linking\n"
-                "- Write meta description-friendly content\n"
-                "- Use proper heading hierarchy\n\n"
-                "3. Formatting:\n"
-                "- Break into short paragraphs\n"
-                "- Use bullet points and numbered lists\n"
-                "- Include blockquotes for important statements\n"
-                "- Add subheadings every 2-3 paragraphs\n\n"
-                "4. Content Quality:\n"
-                "- Include expert quotes and statistics\n"
-                "- Add relevant examples\n"
-                "- Provide actionable insights\n"
-                "- Link to authoritative sources\n\n"
-                f"Please rewrite this tech article following the above guidelines:\n\n{article['content']}\n\n"
-                "Format the output in clean HTML with appropriate heading tags (h2, h3), "
-                "paragraphs, lists, and other semantic HTML elements."
-            )
+            prompt = f"""
+            Rewrite this technology article with proper HTML structure and SEO optimization. Follow this exact format:
+
+            <article class="tech-analysis">
+                <div class="article-header">
+                    <h1>Main Title - Keep Original</h1>
+                    <div class="article-meta">
+                        <span class="publish-date">[Date]</span>
+                        <span class="read-time">5 min read</span>
+                    </div>
+                </div>
+
+                <div class="executive-summary">
+                    <h2>Key Takeaways</h2>
+                    <ul class="key-points">
+                        [3-4 bullet points summarizing main points]
+                    </ul>
+                </div>
+
+                <div class="main-content">
+                    <section class="technology-overview">
+                        <h2>Technology Overview</h2>
+                        [Detailed explanation of the technology/announcement]
+                    </section>
+
+                    <section class="impact-analysis">
+                        <h2>Industry Impact</h2>
+                        [Analysis of how this affects the industry]
+                    </section>
+
+                    <section class="technical-details">
+                        <h2>Technical Details</h2>
+                        [Technical specifications or implementation details]
+                    </section>
+
+                    <section class="expert-insights">
+                        <h2>Expert Analysis</h2>
+                        <blockquote class="expert-quote">
+                            [Include relevant expert quotes]
+                        </blockquote>
+                    </section>
+
+                    <section class="user-implications">
+                        <h2>What This Means for Users</h2>
+                        <ul class="user-impact-points">
+                            [Bullet points about user impact]
+                        </ul>
+                    </section>
+
+                    <section class="future-outlook">
+                        <h2>Future Implications</h2>
+                        [Discussion of future developments and potential impacts]
+                    </section>
+                </div>
+
+                <div class="conclusion">
+                    <h2>Bottom Line</h2>
+                    [Concise conclusion with key takeaway]
+                </div>
+            </article>
+
+            Original Article Text:
+            {article['content']}
+
+            Requirements:
+            1. Maintain journalistic professionalism
+            2. Use proper HTML semantic structure
+            3. Include relevant technical terms naturally
+            4. Break down complex concepts clearly
+            5. Add descriptive subheadings
+            6. Use bullet points for better readability
+            7. Include expert quotes when available
+            8. Optimize for tech-focused SEO
+            9. Keep technical accuracy
+            10. Make content scannable and well-structured
+
+            SEO Requirements:
+            - Use relevant tech keywords naturally
+            - Include semantic HTML5 tags
+            - Proper heading hierarchy (h1, h2, h3)
+            - Short, descriptive paragraphs
+            - Include technical specifications where relevant
+            - Link to related concepts (use <a> tags)
+            - Add alt text for any images
+            - Include meta description worthy content
+
+            Please rewrite the article following this structure while maintaining technical accuracy and SEO optimization.
+            """
 
             response = self.model.generate_content(prompt)
             
             if response.text:
                 rewritten_content = response.text.strip()
-                # Remove 'html' prefix if present
+                # Clean up any markdown or code block indicators
                 rewritten_content = re.sub(r'^(?:html|```html|```)\s*', '', rewritten_content, flags=re.IGNORECASE)
+                rewritten_content = re.sub(r'```\s*$', '', rewritten_content)
+                
+                # Ensure proper HTML structure
+                if not rewritten_content.startswith('<article'):
+                    rewritten_content = f'<article class="tech-analysis">{rewritten_content}</article>'
                 
                 return {
                     'title': article['title'],
-                    'author': article.get('author'),
-                    'date': article.get('date'),
+                    'author': article.get('author', 'Tech Journalist'),
+                    'date': article.get('date', datetime.now().strftime("%Y-%m-%d")),
                     'content': rewritten_content,
                     'preview': self.strip_html(rewritten_content)[:250] + '...',
                     'link': article.get('link', ''),
@@ -275,9 +341,339 @@ class ArticleProcessor:
         print(f"\nProcessed {len(processed_articles)} articles.")
         return processed_articles
 
+class FinanceArticleProcessor:
+    def __init__(self):
+        self.feed_urls = [
+            "https://finance.yahoo.com/news/rssindex",
+            "https://finance.yahoo.com/rss/headline?s=^GSPC",
+            "https://finance.yahoo.com/rss/headline?s=^DJI",
+            "https://finance.yahoo.com/rss/industry"
+        ]
+        self.model = genai.GenerativeModel('gemini-pro')
+        self.api_url = "http://127.0.0.1:8001/api/upload"
+        
+        # Web Scraping Setup
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        ]
+        self.session = self._create_session()
+
+    def _create_session(self):
+        session = requests.Session()
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        return session
+
+    def fetch_articles(self) -> List[Dict]:
+        print("\nParsing Yahoo Finance RSS feeds...")
+        articles = []
+        
+        for feed_url in self.feed_urls:
+            try:
+                feed = feedparser.parse(feed_url)
+                print(f"Found {len(feed.entries)} entries in {feed_url}")
+                
+                for entry in feed.entries:
+                    article = {
+                        'title': entry.title,
+                        'link': entry.link,
+                        'published_date': entry.get('published', ''),
+                        'description': entry.get('description', ''),
+                        'author': entry.get('author', 'Yahoo Finance')
+                    }
+                    articles.append(article)
+                    print(f"Parsed article: {article['title']}")
+                
+                time.sleep(1)  # Respect rate limiting
+                
+            except Exception as e:
+                print(f"Error parsing feed {feed_url}: {str(e)}")
+                continue
+                
+        return articles
+
+    def scrape_article(self, url: str) -> str:
+        try:
+            time.sleep(random.uniform(2, 4))  # Respectful delay
+            
+            headers = {
+                'User-Agent': random.choice(self.user_agents),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Referer': 'https://finance.yahoo.com',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'same-origin',
+                'Cache-Control': 'max-age=0',
+            }
+            
+            response = self.session.get(url, headers=headers, timeout=15)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
+            print(f"\nScraping: {url}")
+            
+            # Try different content selectors for Yahoo Finance
+            content_selectors = [
+                'div[data-test-locator="articleBody"]',
+                'div.caas-body',
+                'div.article-body',
+                'div[data-test-id="article-body"]',
+                'article',
+                'div.content'
+            ]
+            
+            article_content = None
+            for selector in content_selectors:
+                article_content = soup.select_one(selector)
+                if article_content:
+                    break
+            
+            if article_content:
+                # Remove unwanted elements
+                unwanted_classes = [
+                    'ad-container', 'related-content', 'social-share',
+                    'canvas-ad-label', 'comments-wrapper', 'modal',
+                    'author-info', 'read-more', 'premium-promo'
+                ]
+                
+                for unwanted_class in unwanted_classes:
+                    for element in article_content.find_all(class_=lambda x: x and unwanted_class in x.lower()):
+                        element.decompose()
+                
+                # Get paragraphs
+                paragraphs = article_content.find_all(['p', 'h2', 'h3', 'ul', 'ol'])
+                
+                if paragraphs:
+                    # Process and clean content
+                    content_parts = []
+                    for p in paragraphs:
+                        text = p.get_text(strip=True)
+                        if len(text) > 20 and not any(skip in text.lower() for skip in ['advertisement', 'sponsored', 'subscribe']):
+                            content_parts.append(text)
+                    
+                    if content_parts:
+                        content = ' '.join(content_parts)
+                        print(f"Found article content: {len(content)} chars")
+                        return content
+            
+            # If we can't get the content directly, try to extract from meta description
+            meta_desc = soup.find('meta', {'name': 'description'}) or soup.find('meta', {'property': 'og:description'})
+            if meta_desc and meta_desc.get('content'):
+                content = meta_desc.get('content')
+                print(f"Found meta description content: {len(content)} chars")
+                return content
+            
+            print("No valid content found")
+            return ""
+            
+        except Exception as e:
+            print(f"Error scraping article: {str(e)}")
+            return ""
+
+    def rewrite_article(self, article: Dict) -> Dict:
+        try:
+            prompt = """
+            Rewrite this financial article with proper HTML formatting and structure:
+
+            REQUIRED HTML STRUCTURE:
+            <article class="financial-analysis">
+                <div class="market-summary">
+                    <h2>Market Impact Summary</h2>
+                    [Summary content]
+                </div>
+
+                <div class="key-metrics">
+                    <h2>Key Financial Data & Analysis</h2>
+                    <table class="financial-metrics">
+                        [Key metrics in table format]
+                    </table>
+                </div>
+
+                <div class="technical-analysis">
+                    <h2>Technical Analysis</h2>
+                    [Technical analysis content]
+                </div>
+
+                <div class="expert-commentary">
+                    <h2>Expert Market Commentary</h2>
+                    <blockquote class="expert-quote">
+                        [Expert quotes]
+                    </blockquote>
+                </div>
+
+                <div class="investment-implications">
+                    <h2>Investment Implications</h2>
+                    <ul class="key-takeaways">
+                        [Bullet points of key takeaways]
+                    </ul>
+                </div>
+
+                <div class="risk-analysis">
+                    <h2>Risk Considerations</h2>
+                    <ul class="risk-factors">
+                        [List of risk factors]
+                    </ul>
+                </div>
+
+                <div class="future-outlook">
+                    <h2>Future Outlook</h2>
+                    [Future outlook content]
+                </div>
+            </article>
+
+            Original Article:
+            {article['content']}
+
+            Please rewrite the article following this exact HTML structure, ensuring:
+            1. Proper semantic HTML tags
+            2. Clean formatting
+            3. Clear section divisions
+            4. Data presented in tables where relevant
+            5. Expert quotes in blockquotes
+            6. Key points in bullet lists
+            7. Consistent heading hierarchy
+            """
+
+            response = self.model.generate_content(prompt)
+            
+            if response.text:
+                rewritten_content = response.text.strip()
+                # Clean up any markdown or code block indicators
+                rewritten_content = re.sub(r'^(?:html|```html|```)\s*', '', rewritten_content, flags=re.IGNORECASE)
+                rewritten_content = re.sub(r'```\s*$', '', rewritten_content)
+                
+                # Ensure proper HTML structure
+                if not rewritten_content.startswith('<article'):
+                    rewritten_content = f'<article class="financial-analysis">{rewritten_content}</article>'
+                
+                return {
+                    'title': article['title'],
+                    'author': article.get('author', 'Finance Expert'),
+                    'date': article.get('date', datetime.now().strftime("%Y-%m-%d")),
+                    'content': rewritten_content,
+                    'preview': self.strip_html(rewritten_content)[:250] + '...',
+                    'link': article.get('link', ''),
+                    'category': 'finance'
+                }
+            else:
+                print(f"Error: Empty response from Gemini for article: {article['title']}")
+                return article
+                
+        except Exception as e:
+            print(f"Error rewriting article: {str(e)}")
+            return article
+
+    def strip_html(self, text: str) -> str:
+        return re.sub(r'<[^>]+>', '', text)
+
+    def hash_md5(self, article: Dict) -> str:
+        content = f"{article['title']}{article['link']}"
+        return hashlib.md5(content.encode()).hexdigest()
+
+    def does_hash_exist(self, article_hash: str, existing_hashes: set) -> bool:
+        return article_hash in existing_hashes
+
+    def save_hash(self, article_hash: str):
+        with open('processed_hashes.txt', 'a') as f:
+            f.write(article_hash + '\n')
+
+    def load_hashes(self) -> set:
+        try:
+            with open('processed_hashes.txt', 'r') as f:
+                return set(line.strip() for line in f)
+        except FileNotFoundError:
+            return set()
+
+    def upload_article(self, article: Dict) -> bool:
+        try:
+            response = requests.post(self.api_url, json=article)
+            response.raise_for_status()
+            print(f"Successfully uploaded article: {article['title']}")
+            return True
+        except Exception as e:
+            print(f"Error uploading article: {str(e)}")
+            return False
+
+    def process_articles(self):
+        print("Starting Yahoo Finance article processing...")
+        existing_hashes = self.load_hashes()
+        processed_articles = []
+
+        entries = self.fetch_articles()
+
+        for entry in entries[:20]:  # Process first 20 articles
+            try:
+                article_hash = self.hash_md5(entry)
+
+                if self.does_hash_exist(article_hash, existing_hashes):
+                    print(f"Skipping duplicate article: {entry['title']}")
+                    continue
+
+                print(f"\nProcessing article: {entry['title']}")
+                
+                content = self.scrape_article(entry['link'])
+                
+                if content:
+                    article = {
+                        'title': entry['title'],
+                        'content': content,
+                        'author': entry.get('author', 'Yahoo Finance'),
+                        'date': datetime.now().strftime("%Y-%m-%d"),
+                        'link': entry['link'],
+                        'preview': content[:250] + '...' if len(content) > 250 else content
+                    }
+                    
+                    rewritten_article = self.rewrite_article(article)
+                    if self.upload_article(rewritten_article):
+                        processed_articles.append(rewritten_article)
+                        self.save_hash(article_hash)
+                        existing_hashes.add(article_hash)
+                else:
+                    print("No content found for article")
+
+            except KeyboardInterrupt:
+                print("\nProcessing interrupted by user")
+                break
+            except Exception as e:
+                print(f"Error processing article: {str(e)}")
+                continue
+
+        print(f"\nProcessed {len(processed_articles)} Yahoo Finance articles.")
+        return processed_articles
+
 def main():
-    processor = ArticleProcessor()
-    processor.process_articles()
+    try:
+        print("\n=== Starting Technology Articles Processing ===")
+        tech_processor = ArticleProcessor()
+        tech_articles = tech_processor.process_articles()
+        print(f"\nProcessed {len(tech_articles)} technology articles.")
+        
+        print("\n=== Starting Finance Articles Processing ===")
+        finance_processor = FinanceArticleProcessor()
+        finance_articles = finance_processor.process_articles()
+        print(f"\nProcessed {len(finance_articles)} finance articles.")
+        
+        total_articles = len(tech_articles) + len(finance_articles)
+        print(f"\n=== Total Articles Processed: {total_articles} ===")
+        print("Technology Articles:", len(tech_articles))
+        print("Finance Articles:", len(finance_articles))
+        
+    except Exception as e:
+        print(f"Error in main processing: {str(e)}")
+    finally:
+        print("\n=== Processing Complete ===")
 
 if __name__ == "__main__":
     main()
