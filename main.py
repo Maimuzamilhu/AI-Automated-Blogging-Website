@@ -15,12 +15,13 @@ import google.generativeai as genai
 GOOGLE_API_KEY = "AIzaSyA_Wkb7YQgw4vY7ECIW5NhoxIiaKb9WvcY"
 genai.configure(api_key=GOOGLE_API_KEY)
 
+
 class ArticleProcessor:
     def __init__(self):
         self.feed_url = "https://techcrunch.com/feed/"
         self.model = genai.GenerativeModel('gemini-pro')
         self.api_url = "http://127.0.0.1:8001/api/upload"
-        
+
         # Web Scraping Setup
         self.user_agents = [
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -46,7 +47,7 @@ class ArticleProcessor:
         feed = feedparser.parse(self.feed_url)
         print(f"Found {len(feed.entries)} entries in feed")
         articles = []
-        
+
         for entry in feed.entries:
             article = {
                 'title': entry.title,
@@ -68,20 +69,21 @@ class ArticleProcessor:
                 timeout=15
             )
             response.raise_for_status()
-            
+
             soup = BeautifulSoup(response.content, 'html.parser')
             print(f"\nScraping: {url}")
-            
+
             # Get content
             article_content = soup.select_one('div.wp-block-post-content')
             if article_content:
                 # Remove ads and unwanted elements
-                for unwanted in article_content.select('.ad-unit, .wp-block-tc-ads-ad-slot, .marfeel-experience-inline-cta'):
+                for unwanted in article_content.select(
+                        '.ad-unit, .wp-block-tc-ads-ad-slot, .marfeel-experience-inline-cta'):
                     unwanted.decompose()
-                
+
                 # Get paragraphs with wp-block-paragraph class
                 paragraphs = article_content.select('p.wp-block-paragraph')
-                
+
                 if paragraphs:
                     # Filter out short paragraphs and clean text
                     valid_paragraphs = []
@@ -89,15 +91,15 @@ class ArticleProcessor:
                         text = p.get_text(strip=True)
                         if len(text) > 50 and not text.startswith('Image Credits:'):
                             valid_paragraphs.append(text)
-                    
+
                     if valid_paragraphs:
                         content = ' '.join(valid_paragraphs)
                         print(f"Found article content: {len(content)} chars")
                         return content
-            
+
             print("No valid content found")
             return ""
-            
+
         except Exception as e:
             print(f"Error scraping article: {str(e)}")
             return ""
@@ -194,17 +196,17 @@ class ArticleProcessor:
             """
 
             response = self.model.generate_content(prompt)
-            
+
             if response.text:
                 rewritten_content = response.text.strip()
                 # Clean up any markdown or code block indicators
                 rewritten_content = re.sub(r'^(?:html|```html|```)\s*', '', rewritten_content, flags=re.IGNORECASE)
                 rewritten_content = re.sub(r'```\s*$', '', rewritten_content)
-                
+
                 # Ensure proper HTML structure
                 if not rewritten_content.startswith('<article'):
                     rewritten_content = f'<article class="tech-analysis">{rewritten_content}</article>'
-                
+
                 return {
                     'title': article['title'],
                     'author': article.get('author', 'Tech Journalist'),
@@ -217,7 +219,7 @@ class ArticleProcessor:
             else:
                 print(f"Error: Empty response from Gemini for article: {article['title']}")
                 return article
-                
+
         except Exception as e:
             print(f"Error rewriting article: {str(e)}")
             return article
@@ -254,15 +256,15 @@ class ArticleProcessor:
                 'link': article.get('link', ''),
                 'category': 'technology'
             }
-            
+
             try:
                 response = requests.post(
-                    self.api_url, 
+                    self.api_url,
                     json=article_data,
                     timeout=10,
                     headers={'Content-Type': 'application/json'}
                 )
-                
+
                 if response.status_code == 200:
                     print(f"Successfully uploaded article: {article['title']}")
                     return True
@@ -270,14 +272,14 @@ class ArticleProcessor:
                     print(f"Failed to upload article. Status code: {response.status_code}")
                     print(f"Response: {response.text}")
                     return False
-                    
+
             except requests.exceptions.ConnectionError:
                 print("Error: Could not connect to the API server. Make sure it's running.")
                 return False
             except requests.exceptions.Timeout:
                 print("Error: Request timed out")
                 return False
-                
+
         except Exception as e:
             print(f"Error uploading article: {str(e)}")
             return False
@@ -311,9 +313,9 @@ class ArticleProcessor:
                     continue
 
                 print(f"\nProcessing article: {entry['title']}")
-                
+
                 content = self.scrape_article(entry['link'])
-                
+
                 if content:
                     article = {
                         'title': entry['title'],
@@ -323,7 +325,7 @@ class ArticleProcessor:
                         'link': entry['link'],
                         'preview': content[:250] + '...' if len(content) > 250 else content
                     }
-                    
+
                     if self.upload_article(article):
                         processed_articles.append(article)
                         self.save_hash(article_hash)
@@ -341,6 +343,7 @@ class ArticleProcessor:
         print(f"\nProcessed {len(processed_articles)} articles.")
         return processed_articles
 
+
 class FinanceArticleProcessor:
     def __init__(self):
         self.feed_urls = [
@@ -351,7 +354,7 @@ class FinanceArticleProcessor:
         ]
         self.model = genai.GenerativeModel('gemini-pro')
         self.api_url = "http://127.0.0.1:8001/api/upload"
-        
+
         # Web Scraping Setup
         self.user_agents = [
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -375,12 +378,12 @@ class FinanceArticleProcessor:
     def fetch_articles(self) -> List[Dict]:
         print("\nParsing Yahoo Finance RSS feeds...")
         articles = []
-        
+
         for feed_url in self.feed_urls:
             try:
                 feed = feedparser.parse(feed_url)
                 print(f"Found {len(feed.entries)} entries in {feed_url}")
-                
+
                 for entry in feed.entries:
                     article = {
                         'title': entry.title,
@@ -391,19 +394,19 @@ class FinanceArticleProcessor:
                     }
                     articles.append(article)
                     print(f"Parsed article: {article['title']}")
-                
+
                 time.sleep(1)  # Respect rate limiting
-                
+
             except Exception as e:
                 print(f"Error parsing feed {feed_url}: {str(e)}")
                 continue
-                
+
         return articles
 
     def scrape_article(self, url: str) -> str:
         try:
             time.sleep(random.uniform(2, 4))  # Respectful delay
-            
+
             headers = {
                 'User-Agent': random.choice(self.user_agents),
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -417,29 +420,28 @@ class FinanceArticleProcessor:
                 'Sec-Fetch-Site': 'same-origin',
                 'Cache-Control': 'max-age=0',
             }
-            
+
             response = self.session.get(url, headers=headers, timeout=15)
             response.raise_for_status()
-            
+
             soup = BeautifulSoup(response.content, 'html.parser')
             print(f"\nScraping: {url}")
-            
-            # Try different content selectors for Yahoo Finance
+
+            # Updated content selectors for Yahoo Finance
             content_selectors = [
                 'div[data-test-locator="articleBody"]',
                 'div.caas-body',
-                'div.article-body',
                 'div[data-test-id="article-body"]',
                 'article',
                 'div.content'
             ]
-            
+
             article_content = None
             for selector in content_selectors:
                 article_content = soup.select_one(selector)
                 if article_content:
                     break
-            
+
             if article_content:
                 # Remove unwanted elements
                 unwanted_classes = [
@@ -447,117 +449,52 @@ class FinanceArticleProcessor:
                     'canvas-ad-label', 'comments-wrapper', 'modal',
                     'author-info', 'read-more', 'premium-promo'
                 ]
-                
+
                 for unwanted_class in unwanted_classes:
                     for element in article_content.find_all(class_=lambda x: x and unwanted_class in x.lower()):
                         element.decompose()
-                
+
                 # Get paragraphs
                 paragraphs = article_content.find_all(['p', 'h2', 'h3', 'ul', 'ol'])
-                
+
                 if paragraphs:
                     # Process and clean content
                     content_parts = []
                     for p in paragraphs:
                         text = p.get_text(strip=True)
-                        if len(text) > 20 and not any(skip in text.lower() for skip in ['advertisement', 'sponsored', 'subscribe']):
+                        if len(text) > 20 and not any(
+                                skip in text.lower() for skip in ['advertisement', 'sponsored', 'subscribe']):
                             content_parts.append(text)
-                    
+
                     if content_parts:
                         content = ' '.join(content_parts)
                         print(f"Found article content: {len(content)} chars")
                         return content
-            
-            # If we can't get the content directly, try to extract from meta description
-            meta_desc = soup.find('meta', {'name': 'description'}) or soup.find('meta', {'property': 'og:description'})
-            if meta_desc and meta_desc.get('content'):
-                content = meta_desc.get('content')
-                print(f"Found meta description content: {len(content)} chars")
-                return content
-            
+
             print("No valid content found")
             return ""
-            
+
         except Exception as e:
             print(f"Error scraping article: {str(e)}")
             return ""
 
     def rewrite_article(self, article: Dict) -> Dict:
         try:
-            prompt = """
-            Rewrite this financial article with proper HTML formatting and structure:
-
-            REQUIRED HTML STRUCTURE:
-            <article class="financial-analysis">
-                <div class="market-summary">
-                    <h2>Market Impact Summary</h2>
-                    [Summary content]
-                </div>
-
-                <div class="key-metrics">
-                    <h2>Key Financial Data & Analysis</h2>
-                    <table class="financial-metrics">
-                        [Key metrics in table format]
-                    </table>
-                </div>
-
-                <div class="technical-analysis">
-                    <h2>Technical Analysis</h2>
-                    [Technical analysis content]
-                </div>
-
-                <div class="expert-commentary">
-                    <h2>Expert Market Commentary</h2>
-                    <blockquote class="expert-quote">
-                        [Expert quotes]
-                    </blockquote>
-                </div>
-
-                <div class="investment-implications">
-                    <h2>Investment Implications</h2>
-                    <ul class="key-takeaways">
-                        [Bullet points of key takeaways]
-                    </ul>
-                </div>
-
-                <div class="risk-analysis">
-                    <h2>Risk Considerations</h2>
-                    <ul class="risk-factors">
-                        [List of risk factors]
-                    </ul>
-                </div>
-
-                <div class="future-outlook">
-                    <h2>Future Outlook</h2>
-                    [Future outlook content]
-                </div>
-            </article>
+            prompt = f"""
+            Rewrite this financial article into a well-structured narrative without using symbols like percentages or trends. Focus on clarity and readability.
 
             Original Article:
             {article['content']}
-
-            Please rewrite the article following this exact HTML structure, ensuring:
-            1. Proper semantic HTML tags
-            2. Clean formatting
-            3. Clear section divisions
-            4. Data presented in tables where relevant
-            5. Expert quotes in blockquotes
-            6. Key points in bullet lists
-            7. Consistent heading hierarchy
             """
 
             response = self.model.generate_content(prompt)
-            
+
             if response.text:
                 rewritten_content = response.text.strip()
-                # Clean up any markdown or code block indicators
-                rewritten_content = re.sub(r'^(?:html|```html|```)\s*', '', rewritten_content, flags=re.IGNORECASE)
-                rewritten_content = re.sub(r'```\s*$', '', rewritten_content)
-                
                 # Ensure proper HTML structure
                 if not rewritten_content.startswith('<article'):
                     rewritten_content = f'<article class="financial-analysis">{rewritten_content}</article>'
-                
+
                 return {
                     'title': article['title'],
                     'author': article.get('author', 'Finance Expert'),
@@ -570,7 +507,7 @@ class FinanceArticleProcessor:
             else:
                 print(f"Error: Empty response from Gemini for article: {article['title']}")
                 return article
-                
+
         except Exception as e:
             print(f"Error rewriting article: {str(e)}")
             return article
@@ -622,9 +559,9 @@ class FinanceArticleProcessor:
                     continue
 
                 print(f"\nProcessing article: {entry['title']}")
-                
+
                 content = self.scrape_article(entry['link'])
-                
+
                 if content:
                     article = {
                         'title': entry['title'],
@@ -634,7 +571,7 @@ class FinanceArticleProcessor:
                         'link': entry['link'],
                         'preview': content[:250] + '...' if len(content) > 250 else content
                     }
-                    
+
                     rewritten_article = self.rewrite_article(article)
                     if self.upload_article(rewritten_article):
                         processed_articles.append(rewritten_article)
@@ -653,27 +590,29 @@ class FinanceArticleProcessor:
         print(f"\nProcessed {len(processed_articles)} Yahoo Finance articles.")
         return processed_articles
 
+
 def main():
     try:
         print("\n=== Starting Technology Articles Processing ===")
         tech_processor = ArticleProcessor()
         tech_articles = tech_processor.process_articles()
         print(f"\nProcessed {len(tech_articles)} technology articles.")
-        
+
         print("\n=== Starting Finance Articles Processing ===")
         finance_processor = FinanceArticleProcessor()
         finance_articles = finance_processor.process_articles()
         print(f"\nProcessed {len(finance_articles)} finance articles.")
-        
+
         total_articles = len(tech_articles) + len(finance_articles)
         print(f"\n=== Total Articles Processed: {total_articles} ===")
         print("Technology Articles:", len(tech_articles))
         print("Finance Articles:", len(finance_articles))
-        
+
     except Exception as e:
         print(f"Error in main processing: {str(e)}")
     finally:
         print("\n=== Processing Complete ===")
+
 
 if __name__ == "__main__":
     main()

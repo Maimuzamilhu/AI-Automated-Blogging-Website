@@ -1,3 +1,12 @@
+import os
+import google.generativeai as genai
+
+# Configure Google Gemini API
+GOOGLE_API_KEY = "AIzaSyA_Wkb7YQgw4vY7ECIW5NhoxIiaKb9WvcY"
+os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
+genai.configure(api_key=GOOGLE_API_KEY)
+
+# Rest of your imports
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -9,6 +18,7 @@ from typing import Dict
 import uvicorn
 from sqlalchemy import or_
 from sqlalchemy import desc
+
 from math import ceil
 
 
@@ -90,33 +100,7 @@ async def article(request: Request, article_id: int, db: Session = Depends(get_d
             prompt = f"""
             As an expert AI journalist, rewrite and enhance this article following these guidelines:
 
-            CONTENT STRUCTURE:
-            1. Introduction (Hook + Context)
-            2. Main Body (3-4 key sections)
-            3. Expert Analysis/Insights
-            4. Conclusion/Future Implications
-
-            FORMATTING REQUIREMENTS:
-            - Use proper HTML tags (h1, h2, h3, p, ul, li)
-            - Include bullet points for key takeaways
-            - Add subheadings every 2-3 paragraphs
-            - Format quotes and statistics properly
-            - Include a "Key Takeaways" section
-            - Add a "Why It Matters" section
-
-            SEO OPTIMIZATION:
-            - Use relevant keywords naturally
-            - Include semantic HTML markup
-            - Create scannable content
-            - Optimize headings hierarchy
-            - Include internal linking suggestions
-
-            WRITING STYLE:
-            - Professional and authoritative tone
-            - Clear and concise paragraphs
-            - Engaging transitions
-            - Data-driven insights
-            - Industry expert perspectives
+            # ... (rest of your prompt)
 
             Original Article:
             {article.content}
@@ -131,6 +115,9 @@ async def article(request: Request, article_id: int, db: Session = Depends(get_d
                 db.commit()
         except Exception as e:
             print(f"Error rewriting article: {str(e)}")
+            # Log the full error details
+            import traceback
+            print(traceback.format_exc())
     
     return templates.TemplateResponse(
         "article.html",
